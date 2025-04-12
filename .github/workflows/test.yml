@@ -1,9 +1,7 @@
-name: Auto Build Debug APK
+name: Android Release Build
 
 on:
   workflow_dispatch:
-  push:
-    branches: [ main ]
 
 jobs:
   build:
@@ -11,21 +9,22 @@ jobs:
 
     steps:
     # ------ 代码检出 ------
-    - name: Checkout code
-      uses: actions/checkout@v4
+    - uses: actions/checkout@v4  # 升级到最新版
+      with:
+        fetch-depth: 0
 
     # ------ 环境配置 ------
-    - name: Setup JDK 17
+    - name: Set up JDK 17
       uses: actions/setup-java@v4
       with:
         java-version: '17'
         distribution: 'temurin'
 
-    - name: Install Android SDK
+    - name: Setup Android SDK
       uses: android-actions/setup-android@v3
-      with:  # 确保这里用两个空格缩进
-        build-tools-version: "34.0.0"
-        platform-version: "android-34"
+      with:
+        build-tools-version: "34.0.0"  # 与项目配置一致
+        platform-version: "android-34"  # 与compileSdkVersion一致
 
     # ------ 构建优化 ------
     - name: Cache Gradle
@@ -34,6 +33,37 @@ jobs:
         path: |
           ~/.gradle/caches
           ~/.gradle/wrapper
+        key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle*') }}
+
+    # ------ 必要预处理 ------
+    - name: Grant execute permission
+      run: chmod +x gradlew
+
+    - name: Accept licenses
+      run: yes | sdkmanager --licenses
+
+    # ------ 构建任务 ------
+    - name: Build Release APK
+      run: |
+        ./gradlew assembleRelease \
+          --build-cache \
+          --parallel \
+          --warning-mode all
+
+    # ------ 精准收集APK ------
+    - name: Collect APKs
+      run: |
+        APK_DIR="${{ github.workspace }}/apk"
+        mkdir -p "$APK_DIR"
+        # 精确匹配标准输出路径
+        find . -path "*/build/outputs/apk/*release/*.apk" -exec cp {} "$APK_DIR" \;
+
+    # ------ 上传结果 ------
+    - name: Upload Artifact
+      uses: actions/upload-artifact@v4  # 升级到最新版
+      with:
+        name: release-apk-package
+        path: ${{ github.workspace }}/apk/*.apk
         key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*') }}
 
     # ------ 必要预处理 ------
