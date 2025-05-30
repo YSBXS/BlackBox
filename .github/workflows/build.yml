@@ -2,7 +2,7 @@ name: Build APK
 on:
   push:
     branches:
-      - master # 可根据实际情况修改为其他分支
+      - main # 可根据实际情况修改为其他分支
 jobs:
   build:
     runs-on: ubuntu - latest
